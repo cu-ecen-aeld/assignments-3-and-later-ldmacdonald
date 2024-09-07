@@ -1,4 +1,11 @@
 #include "systemcalls.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -16,8 +23,14 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
-
-    return true;
+    int returnCode = system(cmd);
+    if (returnCode == 0){
+        return true;
+    }
+    else {
+        return false;
+    }
+    return false;
 }
 
 /**
@@ -58,10 +71,44 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+    
+    fflush(stdout);
 
+    int status;
+    pid_t pid = fork();
+
+    // Immediately check if fork failed
+    if (pid == -1){
+        return false;
+    }
+
+    if (pid == 0){
+        execv (command[0], command);
+        exit(-1);
+        return false;
+    }
+    // Check if pid > 0, running in parent
+
+    if (pid > 0){
+        // if child still working, return false
+        if (waitpid(pid, &status, 0)== -1){
+            return false;
+        }
+        // Check status conditions, i.e. -1, etc... 
+        // 
+        // i.e. if successful, check the next condition.
+        // What does the line below do?
+        //printf("WIFEXITED status: %d\n", WIFEXITED(status));
+        if (WIFEXITED(status) == 0 ||  WEXITSTATUS(status) == 0){
+            // read about the WEXITSTATUS and WIFEXITED to make sure that I'm using them correctly.
+            // If either is true
+            va_end(args);
+            return true;
+        }
+    }
+          
     va_end(args);
-
-    return true;
+    return false;
 }
 
 /**
@@ -92,8 +139,42 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+    int kidpid;
+    int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
 
+    if (fd < 0) { perror("open"); abort();}
+    switch (kidpid = fork()){
+        case -1: perror("fork"); abort();
+        case 0:
+            if (dup2(fd, 1) < 0) {perror("dup2"); abort();}
+            close(fd);
+            execv(command[0], command); perror("execv"); abort();
+        default:
+            close(fd);
+    }
+
+    // Added code
+    int status;
+
+    if (kidpid > 0){
+        // if child still working, return false
+        if (waitpid(kidpid, &status, 0)== -1){
+            return false;
+        }
+        // Check status conditions, i.e. -1, etc... 
+        // 
+        // i.e. if successful, check the next condition.
+        // What does the line below do?
+        //printf("WIFEXITED status: %d\n", WIFEXITED(status));
+        if (WIFEXITED(status) == 0 ||  WEXITSTATUS(status) == 0){
+            // read about the WEXITSTATUS and WIFEXITED to make sure that I'm using them correctly.
+            // If either is true
+            va_end(args);
+            return true;
+        }
+    }
+
+    // 
     va_end(args);
-
     return true;
 }
