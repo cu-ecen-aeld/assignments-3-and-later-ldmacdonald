@@ -1,0 +1,14 @@
+# Need to install
+sudo apt install flex
+sudo apt install bison
+sudo apt-get install aptitude
+sudo apt-get install libssl-dev
+sudo apt-get install gcc-aarch64-linux-gnu
+sudo apt-get install g++-aarch64-linux-gnu
+sudo apt install qemu-system-arm qemu
+
+Library dependencies
+      [Requesting program interpreter: /lib/ld-linux-aarch64.so.1]
+ 0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]
+ 0x0000000000000001 (NEEDED)             Shared library: [libresolv.so.2]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
