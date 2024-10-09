@@ -1,5 +1,14 @@
+ifeq ($(CROSS_COMPILE),)
+	CC = gcc
+else
+	CC=$(CROSS_COMPILE)gcc
+endif
+
+all:
+	$(CC) -o writer writer.c
+
 writer: writer.c
-	cc writer.c -o writer
+	$(CC) -o writer writer.c
 
 clean:
 	rm -f writer
