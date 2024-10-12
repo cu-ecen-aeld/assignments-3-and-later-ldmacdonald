@@ -129,7 +129,7 @@ cp ${FINDER_APP_DIR}/autorun-qemu.sh ${OUTDIR}/rootfs/home/
 
 # TODO: Chown the root directory
 cd ${OUTDIR}/rootfs
-sudo chown -R root:root *
+chown -R root:root *
 
 # TODO: Create initramfs.cpio.gz
 cd "${OUTDIR}/rootfs"

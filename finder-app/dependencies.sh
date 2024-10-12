@@ -3,6 +3,6 @@
 # Author: Siddhant Jajoo.
 
 
-sudo apt-get install -y libssl-dev
-sudo apt-get install -y u-boot-tools
-sudo apt-get install -y qemu
+apt-get install -y libssl-dev
+apt-get install -y u-boot-tools
+apt-get install -y qemu
