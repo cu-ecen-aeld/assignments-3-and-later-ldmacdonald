@@ -267,13 +267,13 @@ int main (int argc, char *argv[]){
             const int en = errno;
             if(en == EINTR) break;
             syslog(LOG_ERR, "Cannot accept connection (errno %d), exiting", en);
-            close(new_socket);
+            close(server_fd);
             datafile_close(&log_context);
             return 1;
         }
 
         // wrapped recv
-        if(recv_client(server_fd,  &log_context)){
+        if(recv_client(new_socket,  &log_context)){
             close(new_socket);
             break;
         }
