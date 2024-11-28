@@ -6,10 +6,9 @@ on:
         branches:
             - '*'
 jobs:
-    full-test:
-        container: cuaesd/aesd-autotest:24-assignment4-buildroot
+    unit-test:
+        container: cuaesd/aesd-autotest:24-unit-test
         runs-on: self-hosted
-        timeout-minutes: 120
         steps:
           - uses: actions/checkout@v2
           - name: Checkout submodules
