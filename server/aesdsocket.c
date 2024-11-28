@@ -191,7 +191,7 @@ int main (int argc, char *argv[]){
     if (server_fd < 0){
         const int en = errno;
         syslog(LOG_ERR, "Cannot set socket options (errno %d), exiting", en);
-        return 1;
+        return -1;
     }
 
     // Forcefully attaching socket to the PORT value
@@ -199,7 +199,7 @@ int main (int argc, char *argv[]){
         const int en = errno;
         syslog(LOG_ERR, "Cannot set socket options (errno %d), exiting", en);
         close(server_fd);
-        return 1;
+        return -1;
     }
 
 
@@ -215,7 +215,7 @@ int main (int argc, char *argv[]){
         const  int en = errno;
         syslog(LOG_ERR, "Cannot bind socket (errno %d), exiting", en);
         close(server_fd);
-        return 1;
+        return -1;
     }
     
     // Set up signals SIGINT/ SIGTERM
@@ -233,7 +233,7 @@ int main (int argc, char *argv[]){
             const int en = errno;
             syslog(LOG_ERR, "Cannot fork (errno %d), exiting", en);
             close(server_fd);
-            return 1;
+            return -1;
         }
         if(res > 0){
             syslog(LOG_INFO,  "Daemonize successful");
@@ -248,7 +248,7 @@ int main (int argc, char *argv[]){
         const int en = errno;
         syslog(LOG_ERR, "Cannot listen socket (errno %d), exiting", en);
         close(server_fd);
-        return 1;
+        return -1;
     }
 
     datafile_context_t log_context;
@@ -256,7 +256,7 @@ int main (int argc, char *argv[]){
         const int en = errno;
         syslog(LOG_ERR, "Cannot instantiate data file (errno %d), exiting", en);
         close(server_fd);
-        return 1;
+        return -1;
     }
 
     // Set up a loop to listen and accept packets
@@ -269,7 +269,7 @@ int main (int argc, char *argv[]){
             syslog(LOG_ERR, "Cannot accept connection (errno %d), exiting", en);
             close(server_fd);
             datafile_close(&log_context);
-            return 1;
+            return -1;
         }
 
         // wrapped recv
