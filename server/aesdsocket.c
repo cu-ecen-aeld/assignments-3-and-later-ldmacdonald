@@ -16,6 +16,7 @@
 #define BUFFER_SIZE 512
 
 char recv_buffer[BUFFER_SIZE];
+char send_buffer[BUFFER_SIZE] ={0};
 
 void handle_sigint(int sig){
     remove(FILENAME);
@@ -68,8 +69,6 @@ int main(int argc,  char** argv){
     ///    perror("Failure: ");
     //}
 
-    // Bytes and char array to be sent back to the client
-    char sendBuffer[BUFFER_SIZE] ={0};
 
     // Set up socket
     int socket_fd = socket(PF_INET, SOCK_STREAM, 0);
@@ -163,8 +162,8 @@ int main(int argc,  char** argv){
 
                 // Read to socket
                 size_t bytes_read;
-                while((bytes_read = fread(sendBuffer, 1, BUFFER_SIZE, file)) > 0){
-                    if(send(accept_fd, sendBuffer, bytes_read, 0) == -11){
+                while((bytes_read = fread(send_buffer, 1, BUFFER_SIZE, file)) > 0){
+                    if(send(accept_fd, send_buffer, bytes_read, 0) == -11){
                         syslog(LOG_ERR, "Failed to send file contents.  errno: %d", errno);
                         fclose(file);
                         close(accept_fd);
@@ -201,7 +200,6 @@ int main(int argc,  char** argv){
     free(address);
     close(accept_fd);
     close(socket_fd);
-    //remove(FILENAME);
     closelog();
 
     return 0;
