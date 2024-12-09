@@ -9,16 +9,30 @@
 #include <sys/socket.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <signal.h>
 
 #define PORT "9000"
 #define FILENAME "/var/tmp/aesdsocketdata"
+#define BUFFER_SIZE 200000
 
+void handle_sigint(int sig){
+    remove(FILENAME);
+    exit(EXIT_SUCCESS);
+}
+
+void handle_sigterm(int sig){
+    remove(FILENAME);
+    exit(EXIT_SUCCESS);
+}
 
 int main(int argc,  char** argv){
 
     // Syslog
     openlog(NULL, 0, LOG_USER);
     syslog(LOG_INFO, "Starting program\n");
+
+    signal(SIGINT, handle_sigint);
+    signal(SIGTERM, handle_sigterm);
 
     // Check for -d flag
     if((argc == 2) && (argv[1][0] == '-') && (argv[1][1] == 'd')){
@@ -33,17 +47,31 @@ int main(int argc,  char** argv){
         if (pid > 0){
             exit(EXIT_SUCCESS);
         }
+
+        // Create new session to remove tty
+        if(setsid() < 0) exit(EXIT_FAILURE);
+
+
+        // change wd to prevent unmount error
+        chdir("/");
+
+        // Redirect the stdin, stdout, and stderr to /dev/null to prevent console communication
+        close(0);close(1);close(2);
+        open("/dev/null",O_RDWR);dup(0);dup(0);
     }
 
     // Cleanup old file if present
-    remove(FILENAME);
+    //if (remove(FILENAME) != 0){
+    //    syslog(LOG_INFO, "Delete unsuccessful");
+    ///    perror("Failure: ");
+    //}
 
     // Bytes and char array to be sent back to the client
     int32_t len = 0;
-    char sendBuffer[100000] ={0};
+    char sendBuffer[BUFFER_SIZE] ={0};
 
     // Set up socket
-    int socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+    int socket_fd = socket(PF_INET, SOCK_STREAM, 0);
     struct addrinfo *address;
 
     // Set up getaddrinfo() struct
@@ -92,10 +120,11 @@ int main(int argc,  char** argv){
             return 1;
         }
 
+        int bytes_rcv;
+        
         // Receive data from client port
         char buffer[20000] = {0};
-        while(true){
-            int bytes_rcv = recv(accept_fd, buffer, 20000, 0);
+        while((bytes_rcv = recv(accept_fd, buffer, 20000, 0)) > 0){
             if (bytes_rcv == 0){
                 // Nothing received, connection closed by client, break loop
                 break;
@@ -113,6 +142,7 @@ int main(int argc,  char** argv){
             // Add to the send buffer
             strcat(sendBuffer, buffer);
             // Send the 'sendBuffer' as acknowledgment
+            //fread(sendBuffer, sizeof(sendBuffer), 100000, file);
             int bytes_sent = send(accept_fd, sendBuffer, len, 0);
 
             if(bytes_sent == -1){
@@ -128,6 +158,7 @@ int main(int argc,  char** argv){
     free(address);
     close(accept_fd);
     close(socket_fd);
+    //remove(FILENAME);
     closelog();
 
     return 0;
