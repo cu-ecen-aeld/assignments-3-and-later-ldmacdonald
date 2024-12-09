@@ -13,7 +13,7 @@
 
 #define PORT "9000"
 #define FILENAME "/var/tmp/aesdsocketdata"
-#define BUFFER_SIZE 200000
+#define BUFFER_SIZE 512
 
 void handle_sigint(int sig){
     remove(FILENAME);
@@ -72,6 +72,9 @@ int main(int argc,  char** argv){
 
     // Set up socket
     int socket_fd = socket(PF_INET, SOCK_STREAM, 0);
+
+    int reuse = 1;
+    setsockopt(socket_fd,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof(reuse));
     struct addrinfo *address;
 
     // Set up getaddrinfo() struct
@@ -117,11 +120,11 @@ int main(int argc,  char** argv){
 
         if (file ==  NULL) {
             syslog(LOG_ERR, "Was unable to open the file %s, errno: %d", FILENAME, errno);
-            return 1;
+            return -1;
         }
 
         int bytes_rcv;
-        
+
         // Receive data from client port
         char buffer[20000] = {0};
         while((bytes_rcv = recv(accept_fd, buffer, 20000, 0)) > 0){
