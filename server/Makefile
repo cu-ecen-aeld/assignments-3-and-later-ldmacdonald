@@ -1,28 +1,18 @@
-INCLUDE_DIRS = 
-LIB_DIRS = 
-CC=gcc
 
-CDEFS=
-CFLAGS= -O0 -Wall -g $(INCLUDE_DIRS) $(CDEFS)
-LIBS= 
+# Makefile for /server dir
+# Keeping it simple for this time around
 
-HFILES= 
-CFILES= aesdsocket.c
+CC:=${CROSS_COMPILE}gcc
+CFLAGS = -Wall -Wextra -Werror -g
 
-SRCS= ${HFILES} ${CFILES}
-OBJS= ${CFILES:.c=.o}
 
-all:	${CFILES}
-	$(CC) $(LDFLAGS) $(CFLAGS) -o aesdsocket aesdsocket.c -lpthread -lrt
+default: all
 
-default:
-	$(CC) $(LDFLAGS) $(CFLAGS) -o $@ $@.o -lpthread -lrt
+all:
+	${CC} -o aesdsocket *.c ${CFLAGS}
 
 clean:
-	-rm -f *.o *.d
+	rm -rf aesdsocket *.o *.elf *.map
 
-depend:
 
-.c.o:
-	$(CC) $(CFLAGS) -c $<
-
+.PHONY: all default clean

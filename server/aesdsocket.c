@@ -18,12 +18,12 @@
 char recv_buffer[BUFFER_SIZE];
 char send_buffer[BUFFER_SIZE] ={0};
 
-void handle_sigint(int sig){
+void handle_sigint(){
     remove(FILENAME);
     exit(EXIT_SUCCESS);
 }
 
-void handle_sigterm(int sig){
+void handle_sigterm(){
     remove(FILENAME);
     exit(EXIT_SUCCESS);
 }
