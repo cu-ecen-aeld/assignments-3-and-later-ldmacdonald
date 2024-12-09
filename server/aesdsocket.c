@@ -15,6 +15,8 @@
 #define FILENAME "/var/tmp/aesdsocketdata"
 #define BUFFER_SIZE 512
 
+char recv_buffer[BUFFER_SIZE];
+
 void handle_sigint(int sig){
     remove(FILENAME);
     exit(EXIT_SUCCESS);
@@ -67,7 +69,6 @@ int main(int argc,  char** argv){
     //}
 
     // Bytes and char array to be sent back to the client
-    int32_t len = 0;
     char sendBuffer[BUFFER_SIZE] ={0};
 
     // Set up socket
@@ -125,9 +126,11 @@ int main(int argc,  char** argv){
 
         int bytes_rcv;
 
-        // Receive data from client port
-        char buffer[20000] = {0};
-        while((bytes_rcv = recv(accept_fd, buffer, 20000, 0)) > 0){
+        
+        while((bytes_rcv = recv(accept_fd, recv_buffer, BUFFER_SIZE - 1, 0)) > 0){
+            // Receive data from client port
+            recv_buffer[bytes_rcv] = '\0'; // Null terminate the bytes received
+
             if (bytes_rcv == 0){
                 // Nothing received, connection closed by client, break loop
                 break;
@@ -138,20 +141,57 @@ int main(int argc,  char** argv){
                 break;
             }
 
-            // store the received packet in the data file
-            len += bytes_rcv;
-            fprintf(file, "%s", buffer);
+            // Finde newline in received to denote a pacckeet
+            char *nl_pos =  strchr(recv_buffer, '\n');
 
-            // Add to the send buffer
-            strcat(sendBuffer, buffer);
-            // Send the 'sendBuffer' as acknowledgment
-            //fread(sendBuffer, sizeof(sendBuffer), 100000, file);
-            int bytes_sent = send(accept_fd, sendBuffer, len, 0);
+            if (nl_pos != NULL){
+                *nl_pos = '\0'; // Replace newline location wiht null terminaator
 
-            if(bytes_sent == -1){
-                // Unable to send, capture errno
-                syslog(LOG_ERR, "Send Error,  errno: %d\n", errno);
-                break;
+                fputs(recv_buffer, file);
+                fputs("\n", file);
+                fflush(file);
+
+                fclose(file);
+
+                file = fopen(FILENAME, "r");
+                if(!file){
+                    syslog(LOG_ERR, "Failed ot open file for socket read..  errno: %d", errno);
+                    close(accept_fd);
+
+                    return -1;
+                }
+
+                // Read to socket
+                size_t bytes_read;
+                while((bytes_read = fread(sendBuffer, 1, BUFFER_SIZE, file)) > 0){
+                    if(send(accept_fd, sendBuffer, bytes_read, 0) == -11){
+                        syslog(LOG_ERR, "Failed to send file contents.  errno: %d", errno);
+                        fclose(file);
+                        close(accept_fd);
+                        return -1;
+                    }
+                }
+
+                // Close file after reading
+                fclose(file);
+
+                // Reopen for next packet
+                file = fopen(FILENAME, "a");
+                if(!file){
+                    syslog(LOG_ERR, "Failed to reopen file after send.  errrno: %d", errno);
+                    close(accept_fd);
+                    return -1;
+                }
+
+            } else{
+                fputs(recv_buffer, file);
+                fflush(file);
+            }
+
+
+            if(bytes_rcv > 0){
+                // Unable to receive, capture errno
+                syslog(LOG_ERR, "Failed to recive data,  errno: %d\n", errno);
             }
         }
         fclose(file);
