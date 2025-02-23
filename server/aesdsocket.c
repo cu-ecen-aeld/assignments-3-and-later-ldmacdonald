@@ -10,6 +10,13 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <signal.h>
+#include "pthread.h"
+
+// Extra libraries from example, putting here just in case needed
+// #include "fcntl.h"
+// #include <arpa/inet.h>
+// #include <sys/stat.h>
+// #include <netinet/in.h>
 
 #define PORT "9000"
 #define FILENAME "/var/tmp/aesdsocketdata"
@@ -27,6 +34,7 @@ void handle_sigterm(){
     remove(FILENAME);
     exit(EXIT_SUCCESS);
 }
+
 
 int main(int argc,  char** argv){
 

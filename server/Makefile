@@ -4,12 +4,13 @@
 
 CC:=${CROSS_COMPILE}gcc
 CFLAGS = -Wall -Wextra -Werror -g
+LDFLAGS ?= -lpthread
 
 
 default: all
 
 all:
-	${CC} -o aesdsocket *.c ${CFLAGS}
+	${CC} ${CFLAGS} -o aesdsocket *.c  ${LDFLAGS}
 
 clean:
 	rm -rf aesdsocket *.o *.elf *.map
