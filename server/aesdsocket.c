@@ -46,17 +46,6 @@ typedef struct thread_node {
 
 thread_node_t *threads = NULL;
 
-// Signal handling from last assignment
-void handle_sigint(){
-    remove(FILENAME);
-    exit(EXIT_SUCCESS);
-}
-
-void handle_sigterm(){
-    remove(FILENAME);
-    exit(EXIT_SUCCESS);
-}
-
 //Setting up thread handling functions
 void add_thread(pthread_t thread_id, int client_fd){
     thread_node_t *node = (thread_node_t *)malloc(sizeof(thread_node_t));
@@ -85,14 +74,49 @@ void remove_thread(thread_node_t *node){
     free(node);
 }
 
+// Consolidating Signal Handling to include threading/ mutex support
+void signal_handler(int signum __attribute__((unused))) {
+    if (signum == SIGINT || signum == SIGTERM) {
+        syslog(LOG_INFO, "Signal thrown, exiting.");
+        running = 0;
+
+        //Close out any running sockets/ files
+        if(sock_fd >= 0) close(sock_fd);
+        if(client_fd >= 0) close(client_fd);
+        if(file_fd >= 0) close(file_fd);
+        unlink(FILENAME);
+
+        while(threads != NULL) {
+            pthread_join(threads->thread_id, NULL);
+            remove_thread(threads);
+        }
+
+        // Closing out the mutexes
+        pthread_mutex_destroy(&file_mutex);
+        pthread_mutex_destroy(&threads_mutex);
+        pthread_cond_destroy(&threads_cond);
+
+        // Closing Syslog
+        closelog();
+
+        exit(0);
+    }
+}
+
 int main(int argc,  char** argv){
 
     // Syslog
     openlog(NULL, 0, LOG_USER);
     syslog(LOG_INFO, "Starting program\n");
 
-    signal(SIGINT, handle_sigint);
-    signal(SIGTERM, handle_sigterm);
+    if (signal(SIGINT, signal_handler) == SIG_ERR){
+        syslog(LOG_ERR, "Failed to set SIGINT handling.");
+        return 1;
+    }
+    if (signal(SIGTERM, signal_handler) == SIG_ERR){
+        syslog(LOG_ERR, "Failed to set SIGTERM handling.");
+        return 1;
+    }
 
     // Check for -d flag
     if((argc == 2) && (argv[1][0] == '-') && (argv[1][1] == 'd')){
