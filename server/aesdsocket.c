@@ -19,7 +19,7 @@
 // #include <netinet/in.h>
 
 // Existing structure from last assignment
-#define PORT "9000"
+#define PORT 9000
 #define FILENAME "/var/tmp/aesdsocketdata"
 #define BUFFER_SIZE 512
 
@@ -103,6 +103,27 @@ void signal_handler(int signum __attribute__((unused))) {
     }
 }
 
+void *append_timestamp(){
+    while (running) {
+        time_t now = time(NULL);
+        struct tm *tm = gmtime(&now);
+        char timestamp[64];
+        strftime(timestamp, sizeof(timestamp), "timestamp:%Y-Tm-%d %H:%M:%S\n", tm);
+
+        pthread_mutex_lock(&file_mutex);
+        if(write(file_fd, timestamp, strlen(timestamp)) < 0){
+            perror("write timestamp");
+        } else {
+            syslog (LOG_INFO, "Appended timestamp: %s", timestamp);
+        }
+        pthread_mutex_unlock(&file_mutex);
+
+        usleep(10000000);
+    }
+
+    return NULL;
+}
+
 int main(int argc,  char** argv){
 
     // Syslog
@@ -128,38 +149,63 @@ int main(int argc,  char** argv){
     // Set up socket
     socket_fd = socket(AF_INET, SOCK_STREAM, 0);
 
-    int reuse = 1;
-    setsockopt(socket_fd,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof(reuse));
-    struct addrinfo *address;
+    // Rewriting socket based on example, original throws big blocks of red in IDE
+    struct sockaddr_in serv_addr;
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port   = htons(PORT);
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
 
-    // Set up getaddrinfo() struct
-    struct addrinfo hints;
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_PASSIVE;
-    int status = getaddrinfo(NULL, PORT, &hints, &address);
-
-    // Check for success
-    if (status != 0 || address == NULL)
-    {
-        return -1;
+    if(bind(socket_fd, (struct sockaddr*) &serv_addr, sizeof(serv_addr)) != 0){
+        perror("bind");
+        close(socket_fd);
+        return 1;
     }
-
-    // Bind to sockett
-    bind(socket_fd, address->ai_addr, sizeof(struct sockaddr));
     syslog(LOG_INFO, "Bind successful w/ file descriptor %d\n", socket_fd);
+
+    // Daemonize 
+    if(daemon_mode){
+        pid_t pid = fork();
+        if (pid < 0) {
+            syslog(LOG_ERR, "Fork failed");
+            return 1;
+        }
+        if (pid > 0){
+            return 0;
+        }
+        if (setsid() < 0) {
+            perror("setsid");
+            return 1;
+        }
+
+        // More understandable version of IO closes that I did in last version. 
+        close(STDIN_FILENO);
+        close(STDOUT_FILENO);
+        close(STDERR_FILENO);
+        open("/dev/null", O_RDONLY);
+        open("/dev/null", O_WRONLY);
+        open("/dev/null", O_RDWR);
+    }
 
     // Set up listener
     struct sockaddr_storage client_addr;
-    listen(socket_fd, 10);
+    if (listen(socket_fd, 1) != 0){
+        perror("listen");
+        close(socket_fd);
+        return 1;
+    }
     syslog(LOG_INFO, "Listening to connections on %d\n", socket_fd);
 
-    socklen_t addr_size = sizeof(client_addr);
-
-    if(daemon_mode){
-        // placeholder
+    // Opening file
+    file_fd = open(FILENAME, O_CREAT | O_RDWR | O_APPEND, 0644);
+    if (file_fd < 0) {
+        perror("open");
+        close(socket_fd);
+        return 1;
     }
+
+    // Timestamp thread
+
+    socklen_t addr_size = sizeof(client_addr);
 
     // Accept connection
     int accept_fd;
@@ -256,7 +302,6 @@ int main(int argc,  char** argv){
         syslog(LOG_INFO, "Closed connnection from %d.%d.%d.%d:%d\n",client_ip[0], client_ip[1], client_ip[2], client_ip[3], client_port);
     }
     // Cleanup
-    free(address);
     close(accept_fd);
     close(socket_fd);
     closelog();
