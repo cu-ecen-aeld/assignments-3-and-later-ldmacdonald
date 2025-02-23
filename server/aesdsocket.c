@@ -18,6 +18,7 @@
 // #include <sys/stat.h>
 // #include <netinet/in.h>
 
+// Existing structure from last assignment
 #define PORT "9000"
 #define FILENAME "/var/tmp/aesdsocketdata"
 #define BUFFER_SIZE 512
@@ -25,6 +26,27 @@
 char recv_buffer[BUFFER_SIZE];
 char send_buffer[BUFFER_SIZE] ={0};
 
+// Adding in some global socket fd values for init purposes
+int running = 1;
+int sock_fd = -1;
+int client_fd = -1;
+int file_fd = -1;
+
+// Threading init
+int num_threads = 0;
+pthread_mutex_t file_mutex;
+pthread_mutex_t threads_mutex;
+pthread_cond_t threads_cond;
+
+typedef struct thread_node {
+    pthread_t thread_id;
+    int client_fd;
+    struct thread_node *next;
+} thread_node_t;
+
+thread_node_t *threads = NULL;
+
+// Signal handling from last assignment
 void handle_sigint(){
     remove(FILENAME);
     exit(EXIT_SUCCESS);
@@ -35,6 +57,33 @@ void handle_sigterm(){
     exit(EXIT_SUCCESS);
 }
 
+//Setting up thread handling functions
+void add_thread(pthread_t thread_id, int client_fd){
+    thread_node_t *node = (thread_node_t *)malloc(sizeof(thread_node_t));
+    node->thread_id = thread_id;
+    node->client_fd = client_fd;
+    node->next = threads;
+    threads = node;
+
+    pthread_mutex_lock(&threads_mutex);
+    num_threads++;
+    pthread_mutex_unlock(&threads_mutex);
+}
+
+void remove_thread(thread_node_t *node){
+    // If threads is the node to be removed, change threads to the next node in chain
+    if (threads == node){
+        threads = node->next;
+    } else {
+        thread_node_t *current = threads;
+        // Traverse node graph via the 'next' reference
+        while (current->next != node){
+            current = current->next;
+        }
+        current->next = node->next;
+    }
+    free(node);
+}
 
 int main(int argc,  char** argv){
 
