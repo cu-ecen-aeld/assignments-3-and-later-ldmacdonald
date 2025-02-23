@@ -28,7 +28,7 @@ char send_buffer[BUFFER_SIZE] ={0};
 
 // Adding in some global socket fd values for init purposes
 int running = 1;
-int sock_fd = -1;
+int socket_fd = -1;
 int client_fd = -1;
 int file_fd = -1;
 
@@ -81,7 +81,7 @@ void signal_handler(int signum __attribute__((unused))) {
         running = 0;
 
         //Close out any running sockets/ files
-        if(sock_fd >= 0) close(sock_fd);
+        if(socket_fd >= 0) close(socket_fd);
         if(client_fd >= 0) close(client_fd);
         if(file_fd >= 0) close(file_fd);
         unlink(FILENAME);
@@ -118,41 +118,15 @@ int main(int argc,  char** argv){
         return 1;
     }
 
-    // Check for -d flag
+    // Check for -d flag, changing to set daemon_mode flag for later
+    int daemon_mode = 0;
     if((argc == 2) && (argv[1][0] == '-') && (argv[1][1] == 'd')){
-        // create new process
-        int pid = fork();
-
-        // Check for failure
-        if (pid < 0){
-            exit(EXIT_FAILURE);
-        }
-        // Check for success
-        if (pid > 0){
-            exit(EXIT_SUCCESS);
-        }
-
-        // Create new session to remove tty
-        if(setsid() < 0) exit(EXIT_FAILURE);
-
-
-        // change wd to prevent unmount error
-        chdir("/");
-
-        // Redirect the stdin, stdout, and stderr to /dev/null to prevent console communication
-        close(0);close(1);close(2);
-        open("/dev/null",O_RDWR);dup(0);dup(0);
+        daemon_mode = 1;
     }
-
-    // Cleanup old file if present
-    //if (remove(FILENAME) != 0){
-    //    syslog(LOG_INFO, "Delete unsuccessful");
-    ///    perror("Failure: ");
-    //}
 
 
     // Set up socket
-    int socket_fd = socket(PF_INET, SOCK_STREAM, 0);
+    socket_fd = socket(AF_INET, SOCK_STREAM, 0);
 
     int reuse = 1;
     setsockopt(socket_fd,SOL_SOCKET,SO_REUSEADDR,&reuse,sizeof(reuse));
@@ -182,6 +156,10 @@ int main(int argc,  char** argv){
     syslog(LOG_INFO, "Listening to connections on %d\n", socket_fd);
 
     socklen_t addr_size = sizeof(client_addr);
+
+    if(daemon_mode){
+        // placeholder
+    }
 
     // Accept connection
     int accept_fd;
