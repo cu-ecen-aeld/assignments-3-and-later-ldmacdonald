@@ -11,10 +11,10 @@
 #include <unistd.h>
 #include <signal.h>
 #include "pthread.h"
+#include <arpa/inet.h>
 
 // Extra libraries from example, putting here just in case needed
 // #include "fcntl.h"
-// #include <arpa/inet.h>
 // #include <sys/stat.h>
 // #include <netinet/in.h>
 
@@ -124,6 +124,44 @@ void *append_timestamp(){
     return NULL;
 }
 
+void *handle_connection(void *arg){
+    char buffer[BUFFER_SIZE];
+    thread_node_t *node = (thread_node_t *)arg;
+    int client_fd = node-> client_fd;
+
+    while (1){
+        int bytes_received = recv(client_fd, buffer, BUFFER_SIZE, 0);
+        if(bytes_received < 0) {
+            perror("recv");
+            pthread_exit((void *)1);
+        } else if (bytes_received == 0) {
+            break;
+        }
+
+        pthread_mutex_lock(&file_mutex);
+        if(write(file_fd, buffer, bytes_received) <0 ) {
+            perror("write");
+            pthread_mutex_unlock(&file_mutex);
+            pthread_exit((void *)1);
+        }
+        pthread_mutex_unlock(&file_mutex);
+
+        if(strchr(buffer, '\n') != NULL) {
+            lseek(file_fd, 0, SEEK_SET);
+            while((bytes_received = read(file_fd, buffer, BUFFER_SIZE)) > 0) {
+                send(client_fd, buffer, bytes_received, 0);
+            }
+        }
+    }
+
+    close(client_fd);
+    client_fd = -1;
+    free(arg);
+    syslog(LOG_INFO, "Closed socket connection %d", client_fd);
+
+    return NULL;
+}
+
 int main(int argc,  char** argv){
 
     // Syslog
@@ -187,7 +225,6 @@ int main(int argc,  char** argv){
     }
 
     // Set up listener
-    struct sockaddr_storage client_addr;
     if (listen(socket_fd, 1) != 0){
         perror("listen");
         close(socket_fd);
@@ -204,107 +241,56 @@ int main(int argc,  char** argv){
     }
 
     // Timestamp thread
-
-    socklen_t addr_size = sizeof(client_addr);
-
-    // Accept connection
-    int accept_fd;
-    while ((accept_fd = accept(socket_fd, (struct sockaddr *)&client_addr, &addr_size))){
-        struct sockaddr_in *sin = (struct sockaddr_in *)&client_addr;
-        unsigned char *client_ip = (unsigned char *)&sin->sin_addr.s_addr;
-        unsigned short int client_port = sin->sin_port;
-
-        // If successful log client IP and port
-        if (accept_fd != -1){
-            syslog(LOG_INFO, "Accepted connection from %d.%d.%d.%d:%d\n", client_ip[0], client_ip[1], client_ip[2], client_ip[3], client_port);
-        }
-
-        // Setup data file w/ append
-        FILE *file = NULL;
-        file = fopen(FILENAME, "a");
-
-        if (file ==  NULL) {
-            syslog(LOG_ERR, "Was unable to open the file %s, errno: %d", FILENAME, errno);
-            return -1;
-        }
-
-        int bytes_rcv;
-
-        
-        while((bytes_rcv = recv(accept_fd, recv_buffer, BUFFER_SIZE - 1, 0)) > 0){
-            // Receive data from client port
-            recv_buffer[bytes_rcv] = '\0'; // Null terminate the bytes received
-
-            if (bytes_rcv == 0){
-                // Nothing received, connection closed by client, break loop
-                break;
-            }
-            if (bytes_rcv == -1){
-                // Something went wrong with connection, NOT connected anymore
-                syslog(LOG_ERR, "Receive failure errno: %d\n", errno);
-                break;
-            }
-
-            // Finde newline in received to denote a pacckeet
-            char *nl_pos =  strchr(recv_buffer, '\n');
-
-            if (nl_pos != NULL){
-                *nl_pos = '\0'; // Replace newline location wiht null terminaator
-
-                fputs(recv_buffer, file);
-                fputs("\n", file);
-                fflush(file);
-
-                fclose(file);
-
-                file = fopen(FILENAME, "r");
-                if(!file){
-                    syslog(LOG_ERR, "Failed ot open file for socket read..  errno: %d", errno);
-                    close(accept_fd);
-
-                    return -1;
-                }
-
-                // Read to socket
-                size_t bytes_read;
-                while((bytes_read = fread(send_buffer, 1, BUFFER_SIZE, file)) > 0){
-                    if(send(accept_fd, send_buffer, bytes_read, 0) == -11){
-                        syslog(LOG_ERR, "Failed to send file contents.  errno: %d", errno);
-                        fclose(file);
-                        close(accept_fd);
-                        return -1;
-                    }
-                }
-
-                // Close file after reading
-                fclose(file);
-
-                // Reopen for next packet
-                file = fopen(FILENAME, "a");
-                if(!file){
-                    syslog(LOG_ERR, "Failed to reopen file after send.  errrno: %d", errno);
-                    close(accept_fd);
-                    return -1;
-                }
-
-            } else{
-                fputs(recv_buffer, file);
-                fflush(file);
-            }
-
-
-            if(bytes_rcv > 0){
-                // Unable to receive, capture errno
-                syslog(LOG_ERR, "Failed to recive data,  errno: %d\n", errno);
-            }
-        }
-        fclose(file);
-        syslog(LOG_INFO, "Closed connnection from %d.%d.%d.%d:%d\n",client_ip[0], client_ip[1], client_ip[2], client_ip[3], client_port);
+    pthread_t thread_id;
+    thread_node_t *node = (thread_node_t *)malloc(sizeof(thread_node_t));
+    node->client_fd = client_fd;
+    if(pthread_create(&thread_id, NULL, append_timestamp, (void*)node) < 0) {
+        perror("timing pthread create");
+        close(client_fd);
+    } else {
+        add_thread(thread_id, client_fd);
     }
+
+    while (running) {
+        struct sockaddr_in client_addr;
+        socklen_t addr_len = sizeof(client_addr);
+
+        client_fd = accept(socket_fd, (struct sockaddr *) &client_addr, &addr_len);
+        if(client_fd < 0) {
+            perror("accept error");
+            continue;
+        }
+
+        char *client_ip = inet_ntoa(client_addr.sin_addr);
+        syslog(LOG_INFO, "Accepted connection from IP %s.", client_ip);
+
+        // Handling connection in new thread
+        pthread_t thread_id;
+        thread_node_t *node = (thread_node_t *)malloc(sizeof(thread_node_t));
+        node->client_fd = client_fd;
+        if(pthread_create(&thread_id, NULL, handle_connection, (void *)node) < 0){
+            perror("connection error");
+            close(client_fd);
+        } else {
+            add_thread(thread_id, client_fd);
+        }
+    }
+
+    // Thread joining
+    while (threads != NULL) {
+        pthread_join(threads->thread_id, NULL);
+        remove_thread(threads);
+    }
+
     // Cleanup
-    close(accept_fd);
     close(socket_fd);
+    close(file_fd);
+    unlink(FILENAME);
     closelog();
+
+    pthread_mutex_destroy(&file_mutex);
+    pthread_mutex_destroy(&threads_mutex);
+    pthread_cond_destroy(&threads_cond);
 
     return 0;
 }
