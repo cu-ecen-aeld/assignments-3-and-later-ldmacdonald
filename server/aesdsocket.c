@@ -23,9 +23,6 @@
 #define FILENAME "/var/tmp/aesdsocketdata"
 #define BUFFER_SIZE 512
 
-char recv_buffer[BUFFER_SIZE];
-char send_buffer[BUFFER_SIZE] ={0};
-
 // Adding in some global socket fd values for init purposes
 int running = 1;
 int socket_fd = -1;

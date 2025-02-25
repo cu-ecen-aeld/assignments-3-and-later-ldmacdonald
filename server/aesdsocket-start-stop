@@ -1,17 +1,14 @@
-DAEMON="aesdsocket"
-PIDFILE="/var/run/$DAEMON.pid"
-DAEMON_ARGS="-d"
-
+#! /bin/sh
 
 case "$1" in
     start)
         echo "Starting aesdsocket"
         # -- before the -d flag is to ensure that it passes correctly
-        start-stop-daemon -S -q -p "$PIDFILE" --exec "/usr/bin/$DAEMON" -- $DAEMON_ARGS
+        start-stop-daemon -S -n aesdsocket -a /usr/bin/aesdsocket -- -d
         ;;
     stop)
         echo "Stopping aesdsocket"
-        start-stop-daemon -K -p "$PIDFILE"
+        start-stop-daemon -K -n aesdsocket
         ;;
     *)
         echo "Usage $0 {start|stop}"
