@@ -176,9 +176,11 @@ int main(int argc,  char** argv){
 
     // Check for -d flag, changing to set daemon_mode flag for later
     int daemon_mode = 0;
-    if((argc == 2) && (argv[1][0] == '-') && (argv[1][1] == 'd')){
-        daemon_mode = 1;
-    }
+    for (int i = 1; i < argc; i++) {
+      if (strcmp(argv[i], "-d") == 0) {
+          daemon_mode = 1;
+      }
+  }
 
 
     // Set up socket
