@@ -10,7 +10,7 @@ LDFLAGS ?= -lpthread
 default: all
 
 all:
-	${CC} ${CFLAGS} -o aesdsocket *.c  ${LDFLAGS}
+	$(CC) $(CFLAGS) $(INCLUDES) aesdsocket.o -o aesdsocket ${LDFLAGS}
 
 clean:
 	rm -rf aesdsocket *.o *.elf *.map
