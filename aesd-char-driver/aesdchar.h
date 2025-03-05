@@ -5,6 +5,8 @@
  *      Author: Dan Walkes
  */
 
+ #include "aesd-circular-buffer.h"
+
 #ifndef AESD_CHAR_DRIVER_AESDCHAR_H_
 #define AESD_CHAR_DRIVER_AESDCHAR_H_
 
