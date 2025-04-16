@@ -35,8 +35,9 @@ struct aesd_buffer_entry *aesd_circular_buffer_find_entry_offset_for_fpos(struct
     struct aesd_buffer_entry *current_entry;
     size_t total_chars = 0;
     uint8_t start_offs = buffer->out_offs; // Is 'offs' a common abbreviation for offset or just a style thing here?  Matched for style
+    int i;  // Trying to fix a std99 compatability issue
 
-    for (int i = 0; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++){
+    for (i = 0; i < AESDCHAR_MAX_WRITE_OPERATIONS_SUPPORTED; i++){
         current_entry = &buffer->entry[start_offs];
 
         if (total_chars + current_entry->size > char_offset) {
