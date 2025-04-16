@@ -81,6 +81,8 @@ ssize_t aesd_read(struct file *filp, char __user *buf, size_t count,
 
     *f_pos += bytes_to_read;
 
+    mutex_unlock(&dev->lock);
+
     return bytes_to_read;
 }
 
@@ -104,21 +106,26 @@ ssize_t aesd_write(struct file *filp, const char __user *buf, size_t count,
         dev->add_entry.buffptr = krealloc(dev->add_entry.buffptr, dev->add_entry.size + count, GFP_KERNEL);
     }
 
-    if (dev->add_entry.buffptr == 0) {
+    if (dev->add_entry.buffptr == 0) 
+    {
         mutex_unlock(&dev->lock);
         return retval;
     }
 
-    if (copy_from_user((void *)&dev->add_entry.buffptr[dev->add_entry.size], buf, count)) {
+    if (copy_from_user((void *)&dev->add_entry.buffptr[dev->add_entry.size], buf, count)) 
+    {
         mutex_unlock(&dev->lock);
         return -EFAULT;
     }
 
     dev->add_entry.size += count;
 
-    if (strchr(dev->add_entry.buffptr, '\n') != 0) {
-        mutex_unlock(&dev->lock);
-        return -EFAULT;
+    if (strchr(dev->add_entry.buffptr, '\n') != 0) 
+    {
+        aesd_circular_buffer_add_entry(&dev->buffer, &dev->add_entry);
+
+        dev->add_entry.buffptr = 0;
+        dev->add_entry.size = 0;
     }
 
     mutex_unlock(&dev->lock);
