@@ -32,10 +32,8 @@
  struct aesd_dev aesd_device;
  
  int aesd_open(struct inode *inode, struct file *filp) {
-   struct aesd_dev *dev;
    PDEBUG("open");
-   dev = container_of(inode->i_cdev, struct aesd_dev, cdev);
-   filp->private_data = dev;
+   filp->private_data = container_of(inode->i_cdev, struct aesd_dev, cdev);
    return 0;
  }
  
@@ -285,6 +283,7 @@
      return result;
    }
    memset(&aesd_device, 0, sizeof(struct aesd_dev));
+   
    aesd_device.buffer = (struct aesd_circular_buffer *)(kzalloc(
        sizeof(struct aesd_circular_buffer), GFP_KERNEL));
    if (!aesd_device.buffer) {
